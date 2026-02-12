@@ -1,7 +1,7 @@
 'use strict';
 
 const fs = require('fs');
-const { mat4 } = require('./math');
+const { vec3, mat4 } = require('./math');
 const { parseOBJ } = require('./obj-parser');
 const { renderModel, DEFAULTS } = require('./render');
 
@@ -68,6 +68,7 @@ function startAnimation(opts, animOpts) {
     );
 
     config.modelMatrix = modelMatrix;
+    config.lightDir = vec3.normalize(config.camera.position);
     const output = renderModel(model, config);
 
     process.stdout.write(output);

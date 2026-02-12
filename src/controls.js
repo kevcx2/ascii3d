@@ -58,6 +58,7 @@ function startInteractive(opts) {
 
   function redraw() {
     updateCamera();
+    config.lightDir = vec3.normalize(config.camera.position);
     const output = renderModel(model, config);
     process.stdout.write(output);
     // Status line
