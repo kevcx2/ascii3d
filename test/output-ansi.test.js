@@ -23,7 +23,7 @@ console.log('ANSI output contains escape sequences for known RGB');
   const { colorBuf, hitBuf } = makeBuffers(3, 1, [
     { x: 1, y: 0, r: 100, g: 150, b: 200 }
   ]);
-  const out = toANSI(colorBuf, hitBuf, { width: 3, height: 1, char: '#', bgMode: 'empty' });
+  const out = toANSI(colorBuf, hitBuf, { width: 3, height: 1, char: '#', bgMode: 'empty', colorMode: 'truecolor' });
   assert(out.includes('\x1b[38;2;100;150;200m'), 'contains correct escape');
   assert(out.includes('#'), 'contains render char');
 }
@@ -34,7 +34,7 @@ console.log('Empty mode: unhit cells are spaces');
   const { colorBuf, hitBuf } = makeBuffers(3, 1, [
     { x: 1, y: 0, r: 100, g: 100, b: 100 }
   ]);
-  const out = toANSI(colorBuf, hitBuf, { width: 3, height: 1, char: '&', bgMode: 'empty' });
+  const out = toANSI(colorBuf, hitBuf, { width: 3, height: 1, char: '&', bgMode: 'empty', colorMode: 'truecolor' });
   // First char on the row should be a space (cell 0 is unhit)
   const afterHome = out.replace('\x1b[H', '');
   assert(afterHome[0] === ' ', 'first cell is space');
@@ -52,7 +52,7 @@ console.log('Filled mode: unhit cells get char with bgColor');
     colorBuf[i * 3 + 1] = 10;
     colorBuf[i * 3 + 2] = 15;
   }
-  const out = toANSI(colorBuf, hitBuf, { width: 3, height: 1, char: '&', bgMode: 'filled' });
+  const out = toANSI(colorBuf, hitBuf, { width: 3, height: 1, char: '&', bgMode: 'filled', colorMode: 'truecolor' });
   // All cells should be '&' even though none are hit
   assert(out.includes('\x1b[38;2;10;10;15m'), 'has bg color escape');
   const charCount = (out.match(/&/g) || []).length;
@@ -67,7 +67,7 @@ console.log('Run-length: same color → one escape');
     { x: 1, y: 0, r: 50, g: 50, b: 50 },
     { x: 2, y: 0, r: 50, g: 50, b: 50 }
   ]);
-  const out = toANSI(colorBuf, hitBuf, { width: 3, height: 1, char: '@', bgMode: 'empty' });
+  const out = toANSI(colorBuf, hitBuf, { width: 3, height: 1, char: '@', bgMode: 'empty', colorMode: 'truecolor' });
   const escapeCount = (out.match(/\x1b\[38;2;50;50;50m/g) || []).length;
   assert.strictEqual(escapeCount, 1, `only 1 escape for 3 same-color cells, got ${escapeCount}`);
 }

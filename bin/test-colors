@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 'use strict';
 
-// Test script to verify ANSI truecolor support in your terminal.
-// Displays the exact shade ramp that ascii3d uses for rendering.
+// Test script to verify terminal color support for ascii3d.
+// Tests both truecolor (24-bit) and 256-color modes.
+
+const { detectColorMode, rgb256 } = require('../src/output-ansi');
 
 const LIGHT_COLOR   = [255, 200, 150];
 const AMBIENT_COLOR = [30,  30,  50];
@@ -14,57 +16,60 @@ function clamp(v) {
   return Math.min(255, Math.max(0, Math.round(v)));
 }
 
-function fg(r, g, b) {
+function fgTrue(r, g, b) {
   return `\x1b[38;2;${r};${g};${b}m`;
 }
 
-function bg(r, g, b) {
-  return `\x1b[48;2;${r};${g};${b}m`;
+function fg256(r, g, b) {
+  return `\x1b[38;5;${rgb256(r, g, b)}m`;
 }
 
 const RESET = '\x1b[0m';
 
-// ── Header ──────────────────────────────────────────────────
-console.log(`${RESET}\n  ascii3d color test\n`);
+const detected = detectColorMode();
 
-// ── 1. Basic truecolor check ────────────────────────────────
-console.log('  1) Truecolor gradient (should be a smooth red ramp, no banding):');
-process.stdout.write('     ');
-for (let i = 0; i < WIDTH; i++) {
-  const v = Math.round((i / (WIDTH - 1)) * 255);
-  process.stdout.write(`${fg(v, 0, 0)}${CHAR}`);
+console.log(`${RESET}`);
+console.log(`  ascii3d color test`);
+console.log(`  Detected color mode: ${detected}`);
+console.log(`    COLORTERM=${process.env.COLORTERM || '(not set)'}`);
+console.log(`    TERM=${process.env.TERM || '(not set)'}`);
+console.log();
+
+// ── Helper to draw a gradient row with a given fg function ──
+function drawGradientRow(label, fgFn, rFn, gFn, bFn) {
+  process.stdout.write(`     ${label}: `);
+  for (let i = 0; i < WIDTH; i++) {
+    const t = i / (WIDTH - 1);
+    const r = Math.round(rFn(t));
+    const g = Math.round(gFn(t));
+    const b = Math.round(bFn(t));
+    process.stdout.write(`${fgFn(r, g, b)}${CHAR}`);
+  }
+  console.log(RESET);
 }
-console.log(RESET);
 
-process.stdout.write('     ');
-for (let i = 0; i < WIDTH; i++) {
-  const v = Math.round((i / (WIDTH - 1)) * 255);
-  process.stdout.write(`${fg(0, v, 0)}${CHAR}`);
-}
-console.log(RESET);
+// ── Section A: Truecolor (24-bit) ───────────────────────────
+console.log('  A) TRUECOLOR mode (\\x1b[38;2;R;G;Bm):');
+drawGradientRow('  Red', fgTrue, t => t * 255, () => 0, () => 0);
+drawGradientRow('Green', fgTrue, () => 0, t => t * 255, () => 0);
+drawGradientRow(' Blue', fgTrue, () => 0, () => 0, t => t * 255);
 
-process.stdout.write('     ');
-for (let i = 0; i < WIDTH; i++) {
-  const v = Math.round((i / (WIDTH - 1)) * 255);
-  process.stdout.write(`${fg(0, 0, v)}${CHAR}`);
-}
-console.log(RESET);
+// ── Section B: 256-color ────────────────────────────────────
+console.log('\n  B) 256-COLOR mode (\\x1b[38;5;Nm):');
+drawGradientRow('  Red', fg256, t => t * 255, () => 0, () => 0);
+drawGradientRow('Green', fg256, () => 0, t => t * 255, () => 0);
+drawGradientRow(' Blue', fg256, () => 0, () => 0, t => t * 255);
 
-// ── 2. ascii3d shade ramp ───────────────────────────────────
-console.log('\n  2) ascii3d diffuse ramp (ambient → full light):');
-console.log('     diffuse: 0.0 ──────────────────────────────────── 1.0');
-process.stdout.write('     ');
-for (let i = 0; i < WIDTH; i++) {
-  const d = i / (WIDTH - 1); // diffuse 0..1
-  const r = clamp(AMBIENT_COLOR[0] + d * LIGHT_COLOR[0]);
-  const g = clamp(AMBIENT_COLOR[1] + d * LIGHT_COLOR[1]);
-  const b = clamp(AMBIENT_COLOR[2] + d * LIGHT_COLOR[2]);
-  process.stdout.write(`${fg(r, g, b)}${CHAR}`);
-}
-console.log(RESET);
+// ── Section C: Diffuse ramp in both modes ───────────────────
+console.log('\n  C) ascii3d diffuse ramp (ambient → full light):');
+function diffuseR(t) { return clamp(AMBIENT_COLOR[0] + t * LIGHT_COLOR[0]); }
+function diffuseG(t) { return clamp(AMBIENT_COLOR[1] + t * LIGHT_COLOR[1]); }
+function diffuseB(t) { return clamp(AMBIENT_COLOR[2] + t * LIGHT_COLOR[2]); }
+drawGradientRow('truecolor', fgTrue, diffuseR, diffuseG, diffuseB);
+drawGradientRow('  256-col', fg256, diffuseR, diffuseG, diffuseB);
 
-// ── 3. Cube face simulation ─────────────────────────────────
-console.log('\n  3) Simulated cube face shades (what you should see on a cube):');
+// ── Section D: Cube face swatches ───────────────────────────
+console.log('\n  D) Cube face shades (truecolor left, 256-color right):');
 
 const lightDir = [0.5, 0.8, 0.6];
 const len = Math.sqrt(lightDir[0] ** 2 + lightDir[1] ** 2 + lightDir[2] ** 2);
@@ -89,39 +94,20 @@ for (const face of faces) {
   const g = clamp(AMBIENT_COLOR[1] + dot * LIGHT_COLOR[1]);
   const b = clamp(AMBIENT_COLOR[2] + dot * LIGHT_COLOR[2]);
 
-  const swatch = `${fg(r, g, b)}${'&&&&&&&&&&&&&&&&'}${RESET}`;
+  const swatchTrue = `${fgTrue(r, g, b)}${'&&&&&&&&'}${RESET}`;
+  const swatch256  = `${fg256(r, g, b)}${'&&&&&&&&'}${RESET}`;
   const rgb = `(${String(r).padStart(3)}, ${String(g).padStart(3)}, ${String(b).padStart(3)})`;
-  console.log(`     ${face.name}  ${swatch}  ${rgb}  diffuse=${dot.toFixed(2)}`);
+  console.log(`     ${face.name}  ${swatchTrue} ${swatch256}  ${rgb}  d=${dot.toFixed(2)}`);
 }
-
-// ── 4. Background color ─────────────────────────────────────
-console.log(`\n  4) Background color (used in --bg filled mode):`);
-process.stdout.write('     ');
-for (let i = 0; i < WIDTH; i++) {
-  process.stdout.write(`${fg(BG_COLOR[0], BG_COLOR[1], BG_COLOR[2])}${CHAR}`);
-}
-console.log(RESET);
-
-// ── 5. Side-by-side foreground on background ────────────────
-console.log('\n  5) Foreground on background (should be clearly visible):');
-process.stdout.write('     ');
-const midD = 0.5;
-const midR = clamp(AMBIENT_COLOR[0] + midD * LIGHT_COLOR[0]);
-const midG = clamp(AMBIENT_COLOR[1] + midD * LIGHT_COLOR[1]);
-const midB = clamp(AMBIENT_COLOR[2] + midD * LIGHT_COLOR[2]);
-for (let i = 0; i < WIDTH; i++) {
-  process.stdout.write(`${bg(BG_COLOR[0], BG_COLOR[1], BG_COLOR[2])}${fg(midR, midG, midB)}${CHAR}`);
-}
-console.log(RESET);
 
 // ── Summary ─────────────────────────────────────────────────
 console.log(`
-  If you see:
-    - Smooth gradients in test 1        → your terminal supports truecolor
-    - A warm-to-cool ramp in test 2     → shade colors are correct
-    - Distinct colors per face in test 3 → cube shading will work
-    - Visible '&' chars in test 5       → foreground/background contrast OK
+  Look at the gradients above:
+    Section A smooth  → truecolor works, use: --color truecolor
+    Section A banded  → truecolor NOT supported
+    Section B stepped → 256-color works (expected: 6 steps per channel)
 
-  If gradients look banded or all one color, your terminal may not
-  support truecolor. Try setting: export COLORTERM=truecolor
+  ascii3d auto-detected: "${detected}" for your terminal.
+  Override with: node bin/ascii3d model.obj --color 256
+                 node bin/ascii3d model.obj --color truecolor
 `);

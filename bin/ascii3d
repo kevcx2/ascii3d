@@ -19,6 +19,7 @@ Options:
   --debug           Show frame timing
   --fov <n>         Camera field of view in degrees (default: 60)
   --distance <n>    Camera distance from origin (default: 3)
+  --color <mode>    Color mode: auto|truecolor|256 (default: auto)
   -h, --help        Show this help
 `);
 }
@@ -52,6 +53,7 @@ for (let i = 0; i < args.length; i++) {
   else if (arg === '--debug') { debug = true; }
   else if (arg === '--fov') { camera.fov = parseFloat(args[++i]); }
   else if (arg === '--distance') { camera.position = [0, 0, parseFloat(args[++i])]; }
+  else if (arg === '--color') { opts.colorMode = args[++i]; }
   else if (!arg.startsWith('-')) { objFile = arg; }
 }
 

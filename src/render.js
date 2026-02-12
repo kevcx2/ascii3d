@@ -18,6 +18,7 @@ const DEFAULTS = {
   lightDir: [0.5, 0.8, 0.6],
   lightColor: [255, 200, 150],
   ambientColor: [30, 30, 50],
+  colorMode: 'auto',
   output: 'ansi',
   camera: {
     position: [0, 0, 3],
