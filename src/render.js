@@ -16,8 +16,8 @@ const DEFAULTS = {
   bgMode: 'empty',
   bgColor: [20, 20, 20],
   lightDir: [0.5, 0.8, 0.6],
-  lightColor: [255, 255, 255],
-  ambientColor: [40, 40, 40],
+  lightColor: [180, 180, 180],
+  ambientColor: [50, 50, 50],
   colorMode: 'auto',
   output: 'ansi',
   camera: {

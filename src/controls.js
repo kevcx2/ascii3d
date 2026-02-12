@@ -56,7 +56,17 @@ function startInteractive(opts) {
     ];
   }
 
+  let redrawPending = false;
+
+  function scheduleRedraw() {
+    if (!redrawPending) {
+      redrawPending = true;
+      setImmediate(redraw);
+    }
+  }
+
   function redraw() {
+    redrawPending = false;
     updateCamera();
     config.lightDir = vec3.normalize(config.camera.position);
     const output = renderModel(model, config);
@@ -91,30 +101,30 @@ function startInteractive(opts) {
     // Escape sequences for arrow keys
     if (key === '\x1b[D') {        // left arrow
       orbitH -= orbitStep;
-      redraw();
+      scheduleRedraw();
     } else if (key === '\x1b[C') { // right arrow
       orbitH += orbitStep;
-      redraw();
+      scheduleRedraw();
     } else if (key === '\x1b[A') { // up arrow
       orbitV = Math.min(Math.PI / 2 - 0.01, orbitV + orbitStep);
-      redraw();
+      scheduleRedraw();
     } else if (key === '\x1b[B') { // down arrow
       orbitV = Math.max(-Math.PI / 2 + 0.01, orbitV - orbitStep);
-      redraw();
+      scheduleRedraw();
     } else if (key === '+' || key === '=') {
       zoom = Math.max(0.5, zoom - zoomStep);
-      redraw();
+      scheduleRedraw();
     } else if (key === '-' || key === '_') {
       zoom = Math.min(20, zoom + zoomStep);
-      redraw();
+      scheduleRedraw();
     } else if (key === 'r') {
       orbitH = initialOrbitH;
       orbitV = initialOrbitV;
       zoom = initialZoom;
-      redraw();
+      scheduleRedraw();
     } else if (key === 'b') {
       config.bgMode = config.bgMode === 'empty' ? 'filled' : 'empty';
-      redraw();
+      scheduleRedraw();
     } else if (key === 'q' || key === '\x1b') {
       cleanup();
     } else if (key === '\x03') { // Ctrl+C

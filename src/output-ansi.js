@@ -84,7 +84,7 @@ function toANSI(colorBuf, hitBuf, config) {
         parts.push(' ');
       }
     }
-    parts.push('\n');
+    parts.push('\x1b[K\n'); // clear to end of line, then newline
   }
 
   parts.push('\x1b[0m'); // reset at end
