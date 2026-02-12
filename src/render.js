@@ -15,7 +15,7 @@ const DEFAULTS = {
   height: 40,
   bgMode: 'empty',
   bgColor: [20, 20, 30],
-  lightDir: [0.5, 0.8, -0.6],
+  lightDir: [0.5, 0.8, 0.6],
   lightColor: [255, 200, 150],
   ambientColor: [30, 30, 50],
   output: 'ansi',

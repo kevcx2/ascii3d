@@ -38,7 +38,7 @@ function startInteractive(opts) {
   }
 
   // Orbit state
-  let orbitH = 0;      // horizontal angle (radians)
+  let orbitH = 0.6;    // horizontal angle (radians) — start at 3/4 view
   let orbitV = 0.4;    // vertical angle (radians)
   let zoom = vec3.length(config.camera.position);
   const orbitStep = 0.1;
