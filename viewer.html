@@ -410,7 +410,7 @@ function mat4Perspective(fovDeg, aspect, near, far) {
 function mat4LookAt(eye, target, up) {
   const z = normalize([eye[0]-target[0], eye[1]-target[1], eye[2]-target[2]]);
   const x = normalize([up[1]*z[2]-up[2]*z[1], up[2]*z[0]-up[0]*z[2], up[0]*z[1]-up[1]*z[0]]);
-  const y = [x[1]*z[2]-x[2]*z[1], x[2]*z[0]-x[0]*z[2], x[0]*z[1]-x[1]*z[0]];
+  const y = [z[1]*x[2]-z[2]*x[1], z[2]*x[0]-z[0]*x[2], z[0]*x[1]-z[1]*x[0]];
   return new Float32Array([
     x[0],y[0],z[0],0,
     x[1],y[1],z[1],0,
