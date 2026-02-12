@@ -14,10 +14,10 @@ const DEFAULTS = {
   width: 120,
   height: 40,
   bgMode: 'empty',
-  bgColor: [20, 20, 30],
+  bgColor: [20, 20, 20],
   lightDir: [0.5, 0.8, 0.6],
-  lightColor: [255, 200, 150],
-  ambientColor: [30, 30, 50],
+  lightColor: [255, 255, 255],
+  ambientColor: [40, 40, 40],
   colorMode: 'auto',
   output: 'ansi',
   camera: {

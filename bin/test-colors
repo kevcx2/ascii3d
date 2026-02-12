@@ -6,9 +6,9 @@
 
 const { detectColorMode, rgb256 } = require('../src/output-ansi');
 
-const LIGHT_COLOR   = [255, 200, 150];
-const AMBIENT_COLOR = [30,  30,  50];
-const BG_COLOR      = [20,  20,  30];
+const LIGHT_COLOR   = [255, 255, 255];
+const AMBIENT_COLOR = [40,  40,  40];
+const BG_COLOR      = [20,  20,  20];
 const CHAR          = '&';
 const WIDTH         = 60;
 
