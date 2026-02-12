@@ -1,0 +1,86 @@
+#!/usr/bin/env node
+'use strict';
+
+const path = require('path');
+const { render } = require('../src/render');
+
+function printUsage() {
+  console.log(`Usage: ascii3d <model.obj> [options]
+
+Options:
+  --char <c>        Render character (default: &)
+  --width <n>       Grid width in columns (default: 120)
+  --height <n>      Grid height in rows (default: 40)
+  --bg <mode>       Background mode: empty|filled (default: empty)
+  --output <fmt>    Output format: ansi|html (default: ansi)
+  --animate         Enable rotation animation
+  --interactive     Interactive mode with keyboard controls
+  --rpm <n>         Rotations per minute in animate mode (default: 10)
+  --debug           Show frame timing
+  --fov <n>         Camera field of view in degrees (default: 60)
+  --distance <n>    Camera distance from origin (default: 3)
+  -h, --help        Show this help
+`);
+}
+
+const args = process.argv.slice(2);
+
+if (args.length === 0 || args.includes('-h') || args.includes('--help')) {
+  printUsage();
+  process.exit(0);
+}
+
+// Parse arguments
+let objFile = null;
+const opts = {};
+const camera = {};
+let animate = false;
+let interactive = false;
+let rpm = 10;
+let debug = false;
+
+for (let i = 0; i < args.length; i++) {
+  const arg = args[i];
+  if (arg === '--char') { opts.char = args[++i]; }
+  else if (arg === '--width') { opts.width = parseInt(args[++i], 10); }
+  else if (arg === '--height') { opts.height = parseInt(args[++i], 10); }
+  else if (arg === '--bg') { opts.bgMode = args[++i]; }
+  else if (arg === '--output') { opts.output = args[++i]; }
+  else if (arg === '--animate') { animate = true; }
+  else if (arg === '--interactive') { interactive = true; }
+  else if (arg === '--rpm') { rpm = parseFloat(args[++i]); }
+  else if (arg === '--debug') { debug = true; }
+  else if (arg === '--fov') { camera.fov = parseFloat(args[++i]); }
+  else if (arg === '--distance') { camera.position = [0, 0, parseFloat(args[++i])]; }
+  else if (!arg.startsWith('-')) { objFile = arg; }
+}
+
+if (!objFile) {
+  console.error('Error: No OBJ file specified');
+  process.exit(1);
+}
+
+const resolvedPath = path.resolve(objFile);
+
+try {
+  require('fs').accessSync(resolvedPath);
+} catch {
+  console.error(`Error: File not found: ${resolvedPath}`);
+  process.exit(1);
+}
+
+opts.obj = resolvedPath;
+if (Object.keys(camera).length > 0) {
+  opts.camera = camera;
+}
+
+if (interactive) {
+  const { startInteractive } = require('../src/controls');
+  startInteractive(opts);
+} else if (animate) {
+  const { startAnimation } = require('../src/animate');
+  startAnimation(opts, { rpm, debug });
+} else {
+  const frame = render(opts);
+  process.stdout.write(frame);
+}

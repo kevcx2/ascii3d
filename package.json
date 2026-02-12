@@ -1,0 +1,17 @@
+{
+  "name": "ascii3d",
+  "version": "1.0.0",
+  "description": "Pure-JavaScript software 3D renderer that outputs ANSI-colored ASCII to a terminal or browser",
+  "main": "src/render.js",
+  "bin": {
+    "ascii3d": "./bin/ascii3d"
+  },
+  "scripts": {
+    "test": "node test/math.test.js && node test/obj-parser.test.js && node test/pipeline.test.js && node test/rasterizer.test.js && node test/shader.test.js && node test/output-ansi.test.js && node test/output-html.test.js"
+  },
+  "keywords": ["3d", "ascii", "renderer", "terminal", "ansi", "obj"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

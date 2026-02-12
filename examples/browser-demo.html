@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ascii3d Browser Demo</title>
+<style>
+  body {
+    background: #111;
+    color: #ccc;
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  h1 { margin-bottom: 10px; }
+  #controls {
+    margin: 10px 0;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  #controls label { display: flex; align-items: center; gap: 4px; }
+  #controls select, #controls input { background: #222; color: #ccc; border: 1px solid #444; padding: 4px; }
+  #output { margin-top: 10px; }
+  pre { margin: 0; }
+</style>
+</head>
+<body>
+<h1>ascii3d Browser Demo</h1>
+<div id="controls">
+  <label>Char: <input id="charInput" type="text" value="&amp;" maxlength="1" size="2"></label>
+  <label>BG: <select id="bgMode"><option value="empty">Empty</option><option value="filled">Filled</option></select></label>
+  <label>Speed: <input id="speed" type="range" min="0" max="30" value="10"></label>
+  <button id="toggleBtn">Pause</button>
+</div>
+<div id="output"></div>
+
+<script>
+// Inline the ascii3d modules for browser use (no bundler needed)
+// This is a self-contained browser demo
+
+const vec3 = {
+  add(a, b) { return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; },
+  sub(a, b) { return [a[0]-b[0], a[1]-b[1], a[2]-b[2]]; },
+  scale(v, s) { return [v[0]*s, v[1]*s, v[2]*s]; },
+  dot(a, b) { return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]; },
+  cross(a, b) { return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; },
+  length(v) { return Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]); },
+  normalize(v) { const l=vec3.length(v); return l===0?[0,0,0]:[v[0]/l,v[1]/l,v[2]/l]; }
+};
+
+const mat4 = {
+  identity() { const m=new Float64Array(16); m[0]=1;m[5]=1;m[10]=1;m[15]=1; return m; },
+  multiply(a,b) {
+    const o=new Float64Array(16);
+    for(let c=0;c<4;c++) for(let r=0;r<4;r++)
+      o[c*4+r]=a[r]*b[c*4]+a[4+r]*b[c*4+1]+a[8+r]*b[c*4+2]+a[12+r]*b[c*4+3];
+    return o;
+  },
+  rotateX(a) { const m=mat4.identity(),c=Math.cos(a),s=Math.sin(a); m[5]=c;m[9]=-s;m[6]=s;m[10]=c; return m; },
+  rotateY(a) { const m=mat4.identity(),c=Math.cos(a),s=Math.sin(a); m[0]=c;m[8]=s;m[2]=-s;m[10]=c; return m; },
+  rotateZ(a) { const m=mat4.identity(),c=Math.cos(a),s=Math.sin(a); m[0]=c;m[4]=-s;m[1]=s;m[5]=c; return m; },
+  perspective(fov,asp,n,f) {
+    const r=fov*Math.PI/180, t=1/Math.tan(r/2), ri=1/(n-f), m=new Float64Array(16);
+    m[0]=t/asp;m[5]=t;m[10]=(n+f)*ri;m[11]=-1;m[14]=2*n*f*ri; return m;
+  },
+  lookAt(eye,tgt,up) {
+    const z=vec3.normalize(vec3.sub(eye,tgt)),x=vec3.normalize(vec3.cross(up,z)),y=vec3.cross(z,x);
+    const m=new Float64Array(16);
+    m[0]=x[0];m[4]=x[1];m[8]=x[2];m[12]=-vec3.dot(x,eye);
+    m[1]=y[0];m[5]=y[1];m[9]=y[2];m[13]=-vec3.dot(y,eye);
+    m[2]=z[0];m[6]=z[1];m[10]=z[2];m[14]=-vec3.dot(z,eye);
+    m[3]=0;m[7]=0;m[11]=0;m[15]=1; return m;
+  },
+  transformPoint4(m,p) {
+    const x=p[0],y=p[1],z=p[2];
+    return [m[0]*x+m[4]*y+m[8]*z+m[12],m[1]*x+m[5]*y+m[9]*z+m[13],
+            m[2]*x+m[6]*y+m[10]*z+m[14],m[3]*x+m[7]*y+m[11]*z+m[15]];
+  },
+  transformDirection(m,d) {
+    const x=d[0],y=d[1],z=d[2];
+    return vec3.normalize([m[0]*x+m[4]*y+m[8]*z,m[1]*x+m[5]*y+m[9]*z,m[2]*x+m[6]*y+m[10]*z]);
+  }
+};
+
+// Cube OBJ inline
+const CUBE_OBJ = `
+v -1 -1  1
+v  1 -1  1
+v  1  1  1
+v -1  1  1
+v -1 -1 -1
+v  1 -1 -1
+v  1  1 -1
+v -1  1 -1
+vn  0  0  1
+vn  0  0 -1
+vn  1  0  0
+vn -1  0  0
+vn  0  1  0
+vn  0 -1  0
+f 1//1 2//1 3//1 4//1
+f 6//2 5//2 8//2 7//2
+f 2//3 6//3 7//3 3//3
+f 5//4 1//4 4//4 8//4
+f 4//5 3//5 7//5 8//5
+f 5//6 6//6 2//6 1//6
+`;
+
+function parseOBJ(s) {
+  const positions=[], normals=[], faces=[];
+  for(const line of s.split('\n')) {
+    const p=line.trim().split(/\s+/);
+    if(p[0]==='v'&&p.length>=4) positions.push([+p[1],+p[2],+p[3]]);
+    else if(p[0]==='vn'&&p.length>=4) normals.push([+p[1],+p[2],+p[3]]);
+    else if(p[0]==='f'&&p.length>=4) {
+      const fv=[],fn=[];
+      for(let j=1;j<p.length;j++) {
+        const idx=p[j].split('/');
+        const vi=parseInt(idx[0]);
+        fv.push(vi>0?vi-1:positions.length+vi);
+        if(idx.length>=3&&idx[2]!=='') { const ni=parseInt(idx[2]); fn.push(ni>0?ni-1:normals.length+ni); }
+      }
+      for(let j=1;j<fv.length-1;j++)
+        faces.push({v:[fv[0],fv[j],fv[j+1]],n:fn.length?[fn[0],fn[j],fn[j+1]]:[-1,-1,-1]});
+    }
+  }
+  if(normals.length===0) for(const f of faces) {
+    const e1=vec3.sub(positions[f.v[1]],positions[f.v[0]]),e2=vec3.sub(positions[f.v[2]],positions[f.v[0]]);
+    const n=vec3.normalize(vec3.cross(e1,e2)); const ni=normals.length; normals.push(n); f.n=[ni,ni,ni];
+  }
+  // Center and scale
+  if(positions.length) {
+    let mn=[Infinity,Infinity,Infinity],mx=[-Infinity,-Infinity,-Infinity];
+    for(const p of positions) { for(let i=0;i<3;i++) { if(p[i]<mn[i])mn[i]=p[i]; if(p[i]>mx[i])mx[i]=p[i]; } }
+    const c=[(mn[0]+mx[0])/2,(mn[1]+mx[1])/2,(mn[2]+mx[2])/2];
+    const ext=Math.max(mx[0]-mn[0],mx[1]-mn[1],mx[2]-mn[2]);
+    const sc=ext>0?2/ext:1;
+    for(const p of positions) { p[0]=(p[0]-c[0])*sc; p[1]=(p[1]-c[1])*sc; p[2]=(p[2]-c[2])*sc; }
+  }
+  const va=new Float32Array(positions.length*3),na=new Float32Array(normals.length*3);
+  positions.forEach((p,i)=>{va[i*3]=p[0];va[i*3+1]=p[1];va[i*3+2]=p[2];});
+  normals.forEach((n,i)=>{na[i*3]=n[0];na[i*3+1]=n[1];na[i*3+2]=n[2];});
+  return {vertices:va,normals:na,faces};
+}
+
+function renderFrame(model, config, modelMatrix) {
+  const w=config.width, h=config.height;
+  const cam=config.camera;
+  const aspect=(w/h)*0.5;
+  const view=mat4.lookAt(cam.position,cam.target,[0,1,0]);
+  const proj=mat4.perspective(cam.fov,aspect,0.1,100);
+  const mvp=mat4.multiply(proj,mat4.multiply(view,modelMatrix));
+
+  const depthBuf=new Float32Array(w*h).fill(Infinity);
+  const normalBuf=new Float32Array(w*h*3);
+  const hitBuf=new Uint8Array(w*h);
+
+  for(const face of model.faces) {
+    const sv=[];
+    let skip=false;
+    for(let j=0;j<3;j++) {
+      const vi=face.v[j];
+      const v=[model.vertices[vi*3],model.vertices[vi*3+1],model.vertices[vi*3+2]];
+      const cl=mat4.transformPoint4(mvp,v);
+      if(cl[3]<=0){skip=true;break;}
+      sv.push({sx:((cl[0]/cl[3]+1)*0.5)*w, sy:((1-cl[1]/cl[3])*0.5)*h, sz:cl[2]/cl[3]});
+    }
+    if(skip)continue;
+
+    const wn=[];
+    for(let j=0;j<3;j++) {
+      const ni=face.n[j];
+      wn.push(mat4.transformDirection(modelMatrix,[model.normals[ni*3],model.normals[ni*3+1],model.normals[ni*3+2]]));
+    }
+
+    const minX=Math.max(0,Math.floor(Math.min(sv[0].sx,sv[1].sx,sv[2].sx)));
+    const maxX=Math.min(w-1,Math.ceil(Math.max(sv[0].sx,sv[1].sx,sv[2].sx)));
+    const minY=Math.max(0,Math.floor(Math.min(sv[0].sy,sv[1].sy,sv[2].sy)));
+    const maxY=Math.min(h-1,Math.ceil(Math.max(sv[0].sy,sv[1].sy,sv[2].sy)));
+
+    const area=(sv[1].sx-sv[0].sx)*(sv[2].sy-sv[0].sy)-(sv[1].sy-sv[0].sy)*(sv[2].sx-sv[0].sx);
+    if(Math.abs(area)<1e-10)continue;
+    const invA=1/area;
+
+    for(let y=minY;y<=maxY;y++) for(let x=minX;x<=maxX;x++) {
+      const px=x+0.5,py=y+0.5;
+      const w0=((sv[1].sx-px)*(sv[2].sy-py)-(sv[1].sy-py)*(sv[2].sx-px))*invA*(area>0?1:-1);
+      const w1=((sv[2].sx-px)*(sv[0].sy-py)-(sv[2].sy-py)*(sv[0].sx-px))*invA*(area>0?1:-1);
+      const w2=1-w0-w1;
+      if(w0<0||w1<0||w2<0)continue;
+      const z=w0*sv[0].sz+w1*sv[1].sz+w2*sv[2].sz;
+      const idx=y*w+x;
+      if(z<depthBuf[idx]) {
+        depthBuf[idx]=z; hitBuf[idx]=1;
+        const nx=w0*wn[0][0]+w1*wn[1][0]+w2*wn[2][0];
+        const ny=w0*wn[0][1]+w1*wn[1][1]+w2*wn[2][1];
+        const nz=w0*wn[0][2]+w1*wn[1][2]+w2*wn[2][2];
+        const l=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;
+        normalBuf[idx*3]=nx/l;normalBuf[idx*3+1]=ny/l;normalBuf[idx*3+2]=nz/l;
+      }
+    }
+  }
+
+  const lightDir=vec3.normalize(config.lightDir);
+  const lc=config.lightColor, ac=config.ambientColor, bg=config.bgColor;
+  const ch=config.char;
+  const htmlCh=ch==='&'?'&amp;':ch==='<'?'&lt;':ch==='>'?'&gt;':ch;
+  const bgMode=config.bgMode;
+
+  let html='<pre style="font-family:monospace;line-height:1;background:#000;display:inline-block;padding:4px;letter-spacing:0;">';
+  let pr=-1,pg=-1,pb=-1,spanOpen=false;
+  for(let y=0;y<h;y++) {
+    for(let x=0;x<w;x++) {
+      const idx=y*w+x,ci=idx*3;
+      let r,g,b;
+      if(hitBuf[idx]) {
+        const d=Math.max(0,normalBuf[ci]*lightDir[0]+normalBuf[ci+1]*lightDir[1]+normalBuf[ci+2]*lightDir[2]);
+        r=Math.min(255,Math.round(ac[0]+d*lc[0]));
+        g=Math.min(255,Math.round(ac[1]+d*lc[1]));
+        b=Math.min(255,Math.round(ac[2]+d*lc[2]));
+      } else if(bgMode==='filled') {
+        r=bg[0];g=bg[1];b=bg[2];
+      } else {
+        if(spanOpen){html+='</span>';spanOpen=false;pr=-1;}
+        html+=' '; continue;
+      }
+      if(r!==pr||g!==pg||b!==pb) {
+        if(spanOpen)html+='</span>';
+        html+=`<span style="color:rgb(${r},${g},${b})">`;
+        spanOpen=true;pr=r;pg=g;pb=b;
+      }
+      html+=htmlCh;
+    }
+    if(spanOpen){html+='</span>';spanOpen=false;pr=-1;}
+    html+='\n';
+  }
+  html+='</pre>';
+  return html;
+}
+
+// Setup
+const model = parseOBJ(CUBE_OBJ);
+const outputEl = document.getElementById('output');
+const charInput = document.getElementById('charInput');
+const bgSelect = document.getElementById('bgMode');
+const speedSlider = document.getElementById('speed');
+const toggleBtn = document.getElementById('toggleBtn');
+
+let running = true;
+let startTime = Date.now();
+
+toggleBtn.addEventListener('click', () => {
+  running = !running;
+  toggleBtn.textContent = running ? 'Pause' : 'Play';
+  if (running) frame();
+});
+
+function frame() {
+  if (!running) return;
+  const elapsed = (Date.now() - startTime) / 1000;
+  const rpm = parseFloat(speedSlider.value);
+  const angle = (elapsed * rpm * 2 * Math.PI) / 60;
+  const modelMatrix = mat4.multiply(mat4.rotateY(angle), mat4.rotateX(0.4));
+
+  const config = {
+    width: 80,
+    height: 30,
+    char: charInput.value || '&',
+    bgMode: bgSelect.value,
+    bgColor: [20, 20, 30],
+    lightDir: [0.5, 0.8, 0.6],
+    lightColor: [255, 200, 150],
+    ambientColor: [30, 30, 50],
+    camera: { position: [0, 0, 3], target: [0, 0, 0], fov: 60 }
+  };
+
+  outputEl.innerHTML = renderFrame(model, config, modelMatrix);
+  requestAnimationFrame(frame);
+}
+
+frame();
+</script>
+</body>
+</html>
