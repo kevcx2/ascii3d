@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ascii3d – WebGL Reference Viewer</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2a; color: #ccc; font-family: system-ui, sans-serif; display: flex; flex-direction: column; height: 100vh; }
+#toolbar { display: flex; align-items: center; gap: 16px; padding: 8px 16px; background: #111; border-bottom: 1px solid #333; }
+#toolbar label { font-size: 14px; }
+#toolbar select { background: #222; color: #ddd; border: 1px solid #555; padding: 4px 8px; border-radius: 4px; font-size: 14px; }
+#toolbar .info { margin-left: auto; font-size: 12px; color: #888; }
+canvas { flex: 1; display: block; cursor: grab; }
+canvas:active { cursor: grabbing; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <label for="modelSelect">Model:</label>
+  <select id="modelSelect">
+    <option value="cube">cube</option>
+    <option value="suzanne">suzanne</option>
+    <option value="teapot">teapot</option>
+  </select>
+  <span class="info">Drag to orbit &middot; Scroll to zoom &middot; Headlight matches ASCII renderer</span>
+</div>
+<canvas id="gl"></canvas>
+
+<!-- Embed preset OBJ data -->
+<script id="obj-cube" type="text/plain">
+# Simple cube
+v -1.0 -1.0  1.0
+v  1.0 -1.0  1.0
+v  1.0  1.0  1.0
+v -1.0  1.0  1.0
+v -1.0 -1.0 -1.0
+v  1.0 -1.0 -1.0
+v  1.0  1.0 -1.0
+v -1.0  1.0 -1.0
+vn  0.0  0.0  1.0
+vn  0.0  0.0 -1.0
+vn  1.0  0.0  0.0
+vn -1.0  0.0  0.0
+vn  0.0  1.0  0.0
+vn  0.0 -1.0  0.0
+f 1//1 2//1 3//1 4//1
+f 6//2 5//2 8//2 7//2
+f 2//3 6//3 7//3 3//3
+f 5//4 1//4 4//4 8//4
+f 4//5 3//5 7//5 8//5
+f 5//6 6//6 2//6 1//6
+</script>
+
+<script id="obj-suzanne" type="text/plain">
+# Simplified monkey head (Suzanne low-poly approximation)
+v  0.0  0.7  0.8
+v  0.4  0.6  0.7
+v  0.6  0.3  0.7
+v  0.6 -0.1  0.6
+v  0.4 -0.4  0.5
+v  0.0 -0.5  0.5
+v -0.4 -0.4  0.5
+v -0.6 -0.1  0.6
+v -0.6  0.3  0.7
+v -0.4  0.6  0.7
+v  0.0  0.4  0.9
+v  0.25  0.3  0.85
+v  0.3  0.1  0.85
+v  0.2 -0.15  0.8
+v  0.0 -0.2  0.8
+v -0.2 -0.15  0.8
+v -0.3  0.1  0.85
+v -0.25  0.3  0.85
+v  0.0  0.9  0.3
+v  0.4  0.85  0.2
+v  0.6  0.7  0.1
+v -0.4  0.85  0.2
+v -0.6  0.7  0.1
+v  0.0  0.5 -0.5
+v  0.5  0.3 -0.4
+v  0.6  0.0 -0.3
+v -0.5  0.3 -0.4
+v -0.6  0.0 -0.3
+v  0.0 -0.6  0.2
+v  0.3 -0.55  0.1
+v -0.3 -0.55  0.1
+v  0.15  0.35  0.95
+v  0.35  0.35  0.9
+v  0.35  0.15  0.9
+v  0.15  0.15  0.95
+v -0.15  0.35  0.95
+v -0.35  0.35  0.9
+v -0.35  0.15  0.9
+v -0.15  0.15  0.95
+v  0.7  0.5  0.0
+v  0.9  0.7  0.1
+v  0.9  0.4 -0.1
+v -0.7  0.5  0.0
+v -0.9  0.7  0.1
+v -0.9  0.4 -0.1
+f 1 2 12 11
+f 2 3 13 12
+f 3 4 14 13
+f 4 5 15 14
+f 5 6 15
+f 6 7 16 15
+f 7 8 17 16
+f 8 9 18 17
+f 9 10 11 18
+f 10 1 11 18
+f 1 10 22 19
+f 1 19 20 2
+f 2 20 21 3
+f 10 9 23 22
+f 9 8 23
+f 19 24 20
+f 20 24 25 21
+f 22 23 27 24
+f 23 8 28 27
+f 24 27 26 25
+f 21 25 26 3
+f 3 26 28 8
+f 5 30 29 6
+f 6 29 31 7
+f 4 5 30
+f 7 31 8
+f 32 33 34 35
+f 36 37 38 39
+f 3 21 40
+f 40 41 42
+f 21 40 41
+f 9 23 43
+f 43 44 45
+f 23 43 44
+</script>
+
+<script id="obj-teapot" type="text/plain">
+# Simplified teapot (low poly approximation)
+v  0.0  0.0  1.0
+v  0.5  0.0  0.866
+v  0.866  0.0  0.5
+v  1.0  0.0  0.0
+v  0.866  0.0 -0.5
+v  0.5  0.0 -0.866
+v  0.0  0.0 -1.0
+v -0.5  0.0 -0.866
+v -0.866  0.0 -0.5
+v -1.0  0.0  0.0
+v -0.866  0.0  0.5
+v -0.5  0.0  0.866
+v  0.0  0.8  0.7
+v  0.35  0.8  0.606
+v  0.606  0.8  0.35
+v  0.7  0.8  0.0
+v  0.606  0.8 -0.35
+v  0.35  0.8 -0.606
+v  0.0  0.8 -0.7
+v -0.35  0.8 -0.606
+v -0.606  0.8 -0.35
+v -0.7  0.8  0.0
+v -0.606  0.8  0.35
+v -0.35  0.8  0.606
+v  0.0 -0.3  0.8
+v  0.4 -0.3  0.693
+v  0.693 -0.3  0.4
+v  0.8 -0.3  0.0
+v  0.693 -0.3 -0.4
+v  0.4 -0.3 -0.693
+v  0.0 -0.3 -0.8
+v -0.4 -0.3 -0.693
+v -0.693 -0.3 -0.4
+v -0.8 -0.3  0.0
+v -0.693 -0.3  0.4
+v -0.4 -0.3  0.693
+v 0.0 1.0 0.0
+v 0.0 -0.5 0.0
+f 1 2 14 13
+f 2 3 15 14
+f 3 4 16 15
+f 4 5 17 16
+f 5 6 18 17
+f 6 7 19 18
+f 7 8 20 19
+f 8 9 21 20
+f 9 10 22 21
+f 10 11 23 22
+f 11 12 24 23
+f 12 1 13 24
+f 1 25 26 2
+f 2 26 27 3
+f 3 27 28 4
+f 4 28 29 5
+f 5 29 30 6
+f 6 30 31 7
+f 7 31 32 8
+f 8 32 33 9
+f 9 33 34 10
+f 10 34 35 11
+f 11 35 36 12
+f 12 36 25 1
+f 37 13 14
+f 37 14 15
+f 37 15 16
+f 37 16 17
+f 37 17 18
+f 37 18 19
+f 37 19 20
+f 37 20 21
+f 37 21 22
+f 37 22 23
+f 37 23 24
+f 37 24 13
+f 38 26 25
+f 38 27 26
+f 38 28 27
+f 38 29 28
+f 38 30 29
+f 38 31 30
+f 38 32 31
+f 38 33 32
+f 38 34 33
+f 38 35 34
+f 38 36 35
+f 38 25 36
+v  0.9  0.2  0.3
+v  0.9  0.2 -0.3
+v  1.4  0.4  0.2
+v  1.4  0.4 -0.2
+v  0.9  0.5  0.3
+v  0.9  0.5 -0.3
+f 39 40 42 41
+f 39 41 43
+f 40 44 42
+f 43 41 42 44
+v -0.9  0.2  0.2
+v -0.9  0.2 -0.2
+v -1.3  0.4  0.15
+v -1.3  0.4 -0.15
+v -1.3  0.6  0.15
+v -1.3  0.6 -0.15
+v -0.9  0.6  0.2
+v -0.9  0.6 -0.2
+f 45 46 48 47
+f 47 48 50 49
+f 49 50 52 51
+</script>
+
+<script>
+"use strict";
+
+// ---- OBJ Parser (mirrors src/obj-parser.js) ----
+
+function parseOBJ(src) {
+  const positions = [];
+  const normals = [];
+  const faces = [];
+
+  for (const raw of src.split("\n")) {
+    const line = raw.trim();
+    if (!line || line[0] === "#") continue;
+    const p = line.split(/\s+/);
+    if (p[0] === "v" && p.length >= 4) {
+      positions.push([+p[1], +p[2], +p[3]]);
+    } else if (p[0] === "vn" && p.length >= 4) {
+      normals.push([+p[1], +p[2], +p[3]]);
+    } else if (p[0] === "f" && p.length >= 4) {
+      const verts = [], norms = [];
+      for (let j = 1; j < p.length; j++) {
+        const idx = p[j].split("/");
+        const vi = parseInt(idx[0], 10);
+        verts.push(vi > 0 ? vi - 1 : positions.length + vi);
+        if (idx.length >= 3 && idx[2] !== "") {
+          const ni = parseInt(idx[2], 10);
+          norms.push(ni > 0 ? ni - 1 : normals.length + ni);
+        }
+      }
+      for (let j = 1; j < verts.length - 1; j++) {
+        faces.push({
+          v: [verts[0], verts[j], verts[j + 1]],
+          n: norms.length > 0 ? [norms[0], norms[j], norms[j + 1]] : [-1, -1, -1]
+        });
+      }
+    }
+  }
+
+  // Auto-compute normals if missing
+  if (normals.length === 0) {
+    for (const f of faces) {
+      const v0 = positions[f.v[0]], v1 = positions[f.v[1]], v2 = positions[f.v[2]];
+      const e1 = [v1[0]-v0[0], v1[1]-v0[1], v1[2]-v0[2]];
+      const e2 = [v2[0]-v0[0], v2[1]-v0[1], v2[2]-v0[2]];
+      const n = normalize([
+        e1[1]*e2[2] - e1[2]*e2[1],
+        e1[2]*e2[0] - e1[0]*e2[2],
+        e1[0]*e2[1] - e1[1]*e2[0]
+      ]);
+      const ni = normals.length;
+      normals.push(n);
+      f.n = [ni, ni, ni];
+    }
+  }
+
+  // Center and scale (same as src/obj-parser.js)
+  if (positions.length > 0) {
+    let minX=Infinity,minY=Infinity,minZ=Infinity,maxX=-Infinity,maxY=-Infinity,maxZ=-Infinity;
+    for (const p of positions) {
+      if (p[0]<minX) minX=p[0]; if (p[1]<minY) minY=p[1]; if (p[2]<minZ) minZ=p[2];
+      if (p[0]>maxX) maxX=p[0]; if (p[1]>maxY) maxY=p[1]; if (p[2]>maxZ) maxZ=p[2];
+    }
+    const cx=(minX+maxX)/2, cy=(minY+maxY)/2, cz=(minZ+maxZ)/2;
+    const extent = Math.max(maxX-minX, maxY-minY, maxZ-minZ);
+    const s = extent > 0 ? 2/extent : 1;
+    for (const p of positions) { p[0]=(p[0]-cx)*s; p[1]=(p[1]-cy)*s; p[2]=(p[2]-cz)*s; }
+  }
+
+  return { positions, normals, faces };
+}
+
+function normalize(v) {
+  const len = Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);
+  return len > 0 ? [v[0]/len,v[1]/len,v[2]/len] : [0,0,1];
+}
+
+// ---- Build GL buffers from parsed OBJ ----
+
+function buildBuffers(gl, model) {
+  const verts = [];
+  const norms = [];
+  for (const f of model.faces) {
+    for (let i = 0; i < 3; i++) {
+      const p = model.positions[f.v[i]];
+      const n = model.normals[f.n[i]];
+      verts.push(p[0], p[1], p[2]);
+      norms.push(n[0], n[1], n[2]);
+    }
+  }
+  const vBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
+
+  const nBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, nBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(norms), gl.STATIC_DRAW);
+
+  return { vBuf, nBuf, count: verts.length / 3 };
+}
+
+// ---- WebGL setup ----
+
+const VS = `
+  attribute vec3 aPos;
+  attribute vec3 aNorm;
+  uniform mat4 uMVP;
+  uniform mat4 uModel;
+  varying vec3 vNormal;
+  void main() {
+    vNormal = mat3(uModel) * aNorm;
+    gl_Position = uMVP * vec4(aPos, 1.0);
+  }
+`;
+
+const FS = `
+  precision mediump float;
+  varying vec3 vNormal;
+  uniform vec3 uLightDir;
+  uniform vec3 uLightColor;
+  uniform vec3 uAmbient;
+  void main() {
+    vec3 n = normalize(vNormal);
+    float diff = max(dot(n, uLightDir), 0.0);
+    vec3 col = uAmbient + diff * uLightColor;
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+
+function compileShader(gl, type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(s));
+  }
+  return s;
+}
+
+function createProgram(gl) {
+  const prog = gl.createProgram();
+  gl.attachShader(prog, compileShader(gl, gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, compileShader(gl, gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.error(gl.getProgramInfoLog(prog));
+  }
+  return prog;
+}
+
+// ---- Matrix helpers ----
+
+function mat4Perspective(fovDeg, aspect, near, far) {
+  const f = 1 / Math.tan(fovDeg * Math.PI / 360);
+  const nf = 1 / (near - far);
+  return new Float32Array([
+    f/aspect,0,0,0,
+    0,f,0,0,
+    0,0,(far+near)*nf,-1,
+    0,0,2*far*near*nf,0
+  ]);
+}
+
+function mat4LookAt(eye, target, up) {
+  const z = normalize([eye[0]-target[0], eye[1]-target[1], eye[2]-target[2]]);
+  const x = normalize([up[1]*z[2]-up[2]*z[1], up[2]*z[0]-up[0]*z[2], up[0]*z[1]-up[1]*z[0]]);
+  const y = [x[1]*z[2]-x[2]*z[1], x[2]*z[0]-x[0]*z[2], x[0]*z[1]-x[1]*z[0]];
+  return new Float32Array([
+    x[0],y[0],z[0],0,
+    x[1],y[1],z[1],0,
+    x[2],y[2],z[2],0,
+    -(x[0]*eye[0]+x[1]*eye[1]+x[2]*eye[2]),
+    -(y[0]*eye[0]+y[1]*eye[1]+y[2]*eye[2]),
+    -(z[0]*eye[0]+z[1]*eye[1]+z[2]*eye[2]),
+    1
+  ]);
+}
+
+function mat4Identity() {
+  return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]);
+}
+
+function mat4Mul(a, b) {
+  const r = new Float32Array(16);
+  for (let i = 0; i < 4; i++)
+    for (let j = 0; j < 4; j++)
+      for (let k = 0; k < 4; k++)
+        r[j*4+i] += a[k*4+i] * b[j*4+k];
+  return r;
+}
+
+// ---- Main ----
+
+const canvas = document.getElementById("gl");
+const gl = canvas.getContext("webgl", { antialias: true });
+const prog = createProgram(gl);
+gl.useProgram(prog);
+gl.enable(gl.DEPTH_TEST);
+gl.enable(gl.CULL_FACE);
+gl.clearColor(0.08, 0.08, 0.12, 1);
+
+const aPos  = gl.getAttribLocation(prog, "aPos");
+const aNorm = gl.getAttribLocation(prog, "aNorm");
+const uMVP  = gl.getUniformLocation(prog, "uMVP");
+const uModel = gl.getUniformLocation(prog, "uModel");
+const uLightDir   = gl.getUniformLocation(prog, "uLightDir");
+const uLightColor = gl.getUniformLocation(prog, "uLightColor");
+const uAmbient    = gl.getUniformLocation(prog, "uAmbient");
+
+// Lighting: matches ascii3d DEFAULTS
+const lightColor = [180/255, 180/255, 180/255];
+const ambientColor = [50/255, 50/255, 50/255];
+
+// Parse all preset models
+const models = {};
+for (const name of ["cube", "suzanne", "teapot"]) {
+  const src = document.getElementById("obj-" + name).textContent;
+  const parsed = parseOBJ(src);
+  models[name] = buildBuffers(gl, parsed);
+}
+
+let current = models.cube;
+
+// Camera orbit state — matches controls.js defaults
+let orbitH = 0.6;
+let orbitV = 0.4;
+let zoom = 3.0;
+
+function getEye() {
+  return [
+    zoom * Math.sin(orbitH) * Math.cos(orbitV),
+    zoom * Math.sin(orbitV),
+    zoom * Math.cos(orbitH) * Math.cos(orbitV)
+  ];
+}
+
+function draw() {
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height = canvas.clientHeight * devicePixelRatio;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  const eye = getEye();
+  const proj = mat4Perspective(60, canvas.width / canvas.height, 0.1, 100);
+  const view = mat4LookAt(eye, [0,0,0], [0,1,0]);
+  const model = mat4Identity();
+  const mvp = mat4Mul(proj, mat4Mul(view, model));
+
+  gl.uniformMatrix4fv(uMVP, false, mvp);
+  gl.uniformMatrix4fv(uModel, false, model);
+
+  // Headlight: light direction = normalized camera position (same as controls.js)
+  const ld = normalize(eye);
+  gl.uniform3f(uLightDir, ld[0], ld[1], ld[2]);
+  gl.uniform3f(uLightColor, lightColor[0], lightColor[1], lightColor[2]);
+  gl.uniform3f(uAmbient, ambientColor[0], ambientColor[1], ambientColor[2]);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, current.vBuf);
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, current.nBuf);
+  gl.enableVertexAttribArray(aNorm);
+  gl.vertexAttribPointer(aNorm, 3, gl.FLOAT, false, 0, 0);
+
+  gl.drawArrays(gl.TRIANGLES, 0, current.count);
+}
+
+// ---- Interaction ----
+
+let dragging = false, lastX = 0, lastY = 0;
+
+canvas.addEventListener("mousedown", (e) => {
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+});
+window.addEventListener("mouseup", () => { dragging = false; });
+window.addEventListener("mousemove", (e) => {
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  orbitH += dx * 0.008;
+  orbitV = Math.min(Math.PI/2 - 0.01, Math.max(-Math.PI/2 + 0.01, orbitV + dy * 0.008));
+  requestAnimationFrame(draw);
+});
+
+canvas.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  zoom = Math.max(0.5, Math.min(20, zoom + e.deltaY * 0.01));
+  requestAnimationFrame(draw);
+}, { passive: false });
+
+document.getElementById("modelSelect").addEventListener("change", (e) => {
+  current = models[e.target.value];
+  requestAnimationFrame(draw);
+});
+
+window.addEventListener("resize", () => requestAnimationFrame(draw));
+
+draw();
+</script>
+</body>
+</html>
